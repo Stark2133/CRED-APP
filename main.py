@@ -1,6 +1,13 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
+from database import engine
+from models import Base
+from models import User
+from database import SessionLocal
+from sqlalchemy.orm import session
+Base.metadata.create_all(bind=engine)
 app = FastAPI()
+
 
 # -----------------MODELS-------------------
 class userLogin(BaseModel):
@@ -8,16 +15,36 @@ class userLogin(BaseModel):
     password: int
 
 class userRegister(BaseModel):
-    name: str
+    name: str 
     email: str
-    age: int
-    isAdmin: bool
+    password: str
 
 # -------------------ROUTES-----------------
+@app.get('/users')
+def user_data():
+    db = SessionLocal()
+    users = db.query(User).all()
+    db.close()
+    return users
+
+
+@app.get("/users/{user_id}")
+def get_user(user_id: int):
+    db = SessionLocal()
+
+    user = db.query(User).filter(User.id == user_id).first()
+
+    db.close()
+
+    if user is None:
+        return {"error": "User not found"}
+
+    return user
+
 @app.get('/')
 def home():
     return {'message': 'dukaan khuli hai'}
-
+ 
 @app.post('/login')
 def login(data: userLogin):
    return{
@@ -25,11 +52,16 @@ def login(data: userLogin):
        'password': data.password,
    }
 
-@app.post("/signup")
-def signup(data: userRegister):
-    if data.isAdmin == True and data.age > 18 and '@' in data.email:
-        return{
-            'message': 'Registered successfully',
-            'name': data.name,
-            'isAdmin': data.isAdmin,
-        }
+@app.post("/register")
+def register(data: userRegister):
+    db = SessionLocal()
+    newUser = User(
+        name = data.name,
+        email = data.email,
+        password = data.password
+    )
+    db.add(newUser)
+    db.commit()
+    db.refresh(newUser)
+    db.close()
+    return{'message': 'user created susccessfully'}
